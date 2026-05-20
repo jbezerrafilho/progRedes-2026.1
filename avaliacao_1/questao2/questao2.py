@@ -1,4 +1,5 @@
 # 20242014050043 - José Bezerra Filho
+# 20242014050014 - Israel Levi de Paiva Norato
 
 import sys
 import struct
@@ -148,5 +149,5 @@ with arquivo as f:
         else: 
             print("\nApenas um IP foi detectado na captura.")
     intervalo = time_end - time_init
-    print(f'O intervalo de captura do pacote foi de {intervalo:.6f}s!')
+    print(f'O intervalo de captura do pacote foi de {intervalo:.6f}s!\n')
            
