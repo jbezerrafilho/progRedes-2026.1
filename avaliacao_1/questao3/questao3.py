@@ -1,71 +1,88 @@
 # 20242014050043 - José Bezerra Filho
 # 20242014050014 - Israel Levi de Paiva Norato
-
 import os
 import sys
 
+
 raid = {
-    "pasta": "",
-    "num_discos": 0,
+    "qtd_discos": 0,
     "tam_disco": 0,
     "tam_bloco": 0,
-    "discos_ausentes": [],
+    "pasta": "",
+    "discos_ausentes": []
 }
 
-def get_config():
 
+def get_config():
     try:
-        num_discos = int(input("Quantidade de discos [03 - mínimo]: "))
+        qtd_discos = int(input("Quantidade de discos [03 - mínimo]: "))
         tam_disco = int(input("Tamanho do disco em bytes: "))
         tam_bloco = int(input("Tamanho do bloco em bytes: "))
         pasta = input("Salvar no caminho: ").strip()
-        if num_discos < 3:
-            print("Erro: RAID4 exige no mínimo 3 discos.")
-            return None
-
-        if tam_disco <= 0 or tam_bloco <= 0:
-            print("Erro: tamanhos devem ser maiores que zero.")
-            return None
-
-        if tam_disco % tam_bloco != 0:
-            print("Erro: o tamanho do disco deve ser múltiplo do bloco.")
-            return None
-        return (num_discos, tam_disco, tam_bloco, pasta)
-    
     except ValueError:
         print("Digite números inteiros onde solicitado")
         return None
+    if qtd_discos < 3:
+        print("Erro: RAID4 exige no mínimo 3 discos.")
+        return None
 
-def set_config(num_discos, tam_disco, tam_bloco, pasta):
+    if tam_disco <= 0 or tam_bloco <= 0:
+        print("Erro: tamanhos devem ser maiores que zero.")
+        return None
 
-    raid["num_discos"] = num_discos
+    if tam_disco % tam_bloco != 0:
+        print("Erro: o tamanho do disco deve ser múltiplo do bloco.")
+        return None
+    return (qtd_discos, tam_disco, tam_bloco, pasta)
+    
+
+def set_config(qtd_discos, tam_disco, tam_bloco, pasta):
+    raid["qtd_discos"] = qtd_discos
     raid["tam_disco"] = tam_disco
     raid["tam_bloco"] = tam_bloco
     raid["pasta"] = pasta
     raid["discos_ausentes"] = []
 
-def get_disc_pos(pos_log):
+
+def valida_posicao(pos_inicio, tam_dados):
+
+    qtd_disc_dados = raid["qtd_discos"] - 1
+    tam_logico = qtd_disc_dados * raid["tam_disco"]
+
+    if not (0 <= pos_inicio < tam_logico):
+        print("Erro: Posição fora do intervalo!")
+        return False
+
+    if pos_inicio + tam_dados > tam_logico:
+        print("Erro: Dados ultrapassam o tamanho lógico.")
+        return False
+
+    return True
+
+
+def get_disc_pos(cursor):
 
     tam_bloco = raid["tam_bloco"]
-    qtd_discos = raid["num_discos"] - 1
+    qtd_discos_dados = raid["qtd_discos"] - 1
 
-    bloco = pos_log // tam_bloco
-    disco = bloco % qtd_discos
-    linha = bloco // qtd_discos
-    offset = pos_log % tam_bloco
+    bloco = cursor // tam_bloco
+    disco = bloco % qtd_discos_dados
+    linha = bloco // qtd_discos_dados
+    offset = cursor % tam_bloco
     pos_f = (linha * tam_bloco) + offset
 
     return (disco, linha, offset, pos_f)
 
+
 def set_paridade(linha):
 
-    qtd_discos = raid["num_discos"] - 1
+    qtd_discos_dados = raid["qtd_discos"] - 1
     tam_bloco = raid["tam_bloco"]
     pasta = raid["pasta"]
     pos_bloco = linha * tam_bloco
     paridade = bytearray(tam_bloco)
 
-    for i in range(qtd_discos):
+    for i in range(qtd_discos_dados):
 
         if i in raid["discos_ausentes"]:
             continue
@@ -78,15 +95,14 @@ def set_paridade(linha):
                 dados = f.read(tam_bloco)
 
             for j in range(len(dados)):
-                paridade[j] ^= dados[j]
+                paridade[j]  = paridade[j] ^ dados[j]
 
         except Exception as e:
             print(f"Erro ao ler disco{i}.bin para paridade: {e}")
             return
 
-    idx_disco_par = raid["num_discos"] - 1
+    idx_disco_par = raid["qtd_discos"] - 1
 
-   
     if idx_disco_par in raid["discos_ausentes"]:
         print("Aviso: disco de paridade ausente — paridade não atualizada.")
         return
@@ -101,42 +117,27 @@ def set_paridade(linha):
     except Exception as e:
         print(f"Erro ao escrever disco de paridade: {e}")
 
-def valida_posicao(pos_inicio, tam_dados):
-
-    qtd_disc_dados = raid["num_discos"] - 1
-    tam_logico = qtd_disc_dados * raid["tam_disco"]
-
-    if not (0 <= pos_inicio < tam_logico):
-        print("Erro: Posição fora do intervalo!")
-        return False
-
-    if pos_inicio + tam_dados > tam_logico:
-        print("Erro: Dados ultrapassam o tamanho lógico.")
-        return False
-
-    return True
 
 def inicializa_raid():
 
     print("\nIniciando Raid 4")
     config = get_config()
-
     if config is None:
         return
     
-    num_discos, tam_disco, tam_bloco, pasta = config
-    set_config(num_discos, tam_disco, tam_bloco, pasta)
+    qtd_discos, tam_disco, tam_bloco, pasta = config
+    set_config(qtd_discos, tam_disco, tam_bloco, pasta)
 
     try:
         os.makedirs(pasta, exist_ok=True)
         print("pasta criada")
-
     except Exception as e:
         print(f"Erro ao criar pasta {e}")
-
-    num_discos_dados = num_discos - 1
+        return
+    qtd_discos_dados = qtd_discos - 1
+    
     try:
-        for i in range(num_discos_dados):
+        for i in range(qtd_discos_dados):
             caminho = os.path.join(pasta, f"disco{i}.bin")
             with open(caminho, "wb") as f:
                 f.write(b"\x00" * tam_disco)
@@ -144,31 +145,35 @@ def inicializa_raid():
         print(f"Erro ao criar disco de dados: {e}")
 
     try:
-        idx_disco_par = num_discos - 1
+        idx_disco_par = qtd_discos - 1
         cam_disco_par = os.path.join(pasta, f"disco{idx_disco_par}.bin")
         with open(cam_disco_par, "wb") as f:
             f.write(b"\x00" * tam_disco)
     except Exception as e:
         print(f"Erro ao criar disco de paridade: {e}")
 
-    print("\nRaid 4 iniciado com sucesso!\n"   
-      f"  Discos: {num_discos_dados}\n"    
-      f"  Capacidade: {num_discos_dados * tam_disco} bytes\n") 
+    print("\nRaid 4 iniciado com sucesso!\n"
+      f"  Discos de dados  : {qtd_discos_dados} x {tam_disco} bytes\n"
+      f"  Disco de paridade: 1 x {tam_disco} bytes\n"        
+      f"  Capacidade lógica: {qtd_discos_dados * tam_disco} bytes\n"
+      f"  Blocos por disco : {tam_disco // tam_bloco}\n")     
+
 
 def obtem_raid():
 
     print("\n=== Obtendo INFOs do RAID 4 ===")
-    respostas = get_config()
-    if respostas is None:
+    config = get_config()
+    if config is None:
         return
-    num_discos, tam_disco, tam_bloco, pasta = respostas
-    set_config(num_discos, tam_disco, tam_bloco, pasta)
+    
+    qtd_discos, tam_disco, tam_bloco, pasta = config
+    set_config(qtd_discos, tam_disco, tam_bloco, pasta)
 
     print("\nVerificando discos...")
 
-    for i in range(num_discos):
+    for i in range(qtd_discos):
         caminho = os.path.join(pasta, f"disco{i}.bin")
-        tipo = "PARID" if i == (num_discos - 1) else "dados"
+        tipo = "PARID" if i == (qtd_discos - 1) else "dados"
 
         if os.path.exists(caminho):
             tamanho_real = os.path.getsize(caminho)  
@@ -189,27 +194,26 @@ def obtem_raid():
 
     qtd_ausentes = len(raid["discos_ausentes"])
 
-    if qtd_ausentes == 0:
+    if not raid["discos_ausentes"]:
         print("\nRaid 4 Saudável. Operando Normalmente!")
-
     elif qtd_ausentes == 1:
         print("\nRaid 4 Degradado!")
         idx_disco = raid["discos_ausentes"][0]
-        tipo = "PARIDADE" if idx_disco == num_discos - 1 else "dados"
+        tipo = "PARIDADE" if idx_disco == qtd_discos - 1 else "dados"
         print(f"Substitua o disco{idx_disco}.bin - {tipo}")
     else:
         sys.exit("\nErro fatal: Possível perda de DADOS!")
 
+
 def escreve_raid():
 
     print("\n === Escrevendo no Raid 4 ===")
-    tam_bloco = raid["tam_bloco"]
-    tam_logico = raid["tam_disco"] * (raid["num_discos"] - 1)
+    tam_logico = raid["tam_disco"] * (raid["qtd_discos"] - 1)
+
+    dados = input("Dados para gravar: ").encode("utf-8") 
 
     try:
-        dados = input("Dados para gravar: ").encode("utf-8")
         pos_inicio = int(input(f"Posicao Inicial [0 a {tam_logico - 1}]: "))
-
     except ValueError:
         print("Erro: A posicao deve ser um número inteiro.")
         return
@@ -217,17 +221,17 @@ def escreve_raid():
     if not valida_posicao(pos_inicio, len(dados)):
         return
 
-    pos_logica = pos_inicio
-    dados_restantes = dados
-    tam_bloco = raid["tam_bloco"]
+    cursor         = pos_inicio
+    dados_a_gravar = dados
+    tam_bloco      = raid["tam_bloco"]
 
-    while len(dados_restantes) > 0:
+    while dados_a_gravar:
 
-        disco, linha, offset, pos_f = get_disc_pos(pos_logica)
+        disco, linha, offset, pos_f = get_disc_pos(cursor)
 
-        espaco_bloco = tam_bloco - offset
-        qtd_escrever = min(espaco_bloco, len(dados_restantes))
-        fatia = dados_restantes[:qtd_escrever]
+        espaco_bloco              = tam_bloco - offset
+        dados_permitidos_no_bloco = min(espaco_bloco, len(dados_a_gravar))
+        fatia                     = dados_a_gravar[:dados_permitidos_no_bloco]
 
         if disco in raid["discos_ausentes"]:
             print(f"Disco{disco} Ausente")
@@ -240,16 +244,18 @@ def escreve_raid():
             except Exception as e:
                 print(f"Erro ao escrever no disco{disco}.bin: {e}")
                 return
+
         set_paridade(linha)
-        dados_restantes = dados_restantes[qtd_escrever:]
-        pos_logica += qtd_escrever
+        dados_a_gravar = dados_a_gravar[dados_permitidos_no_bloco:]
+        cursor        += dados_permitidos_no_bloco
+
     print(f"\n{len(dados)} bytes gravados a partir da posição {pos_inicio} [OK].")
 
 def le_raid():
 
     print("\n === Lendo do Raid 4 ===")
     tam_bloco  = raid["tam_bloco"]
-    tam_logico = raid["tam_disco"] * (raid["num_discos"] - 1)
+    tam_logico = raid["tam_disco"] * (raid["qtd_discos"] - 1)
 
     try:
         pos_inicio = int(input(f"Posição inicial [0 a {tam_logico - 1}]: "))
@@ -261,23 +267,23 @@ def le_raid():
     if not valida_posicao(pos_inicio, qtd_bytes):
         return
 
-    pos_logica   = pos_inicio
-    bytes_faltam = qtd_bytes
-    dados_lidos  = bytearray()
+    cursor = pos_inicio
+    bytes_a_ler = qtd_bytes
+    bytes_lidos  = bytearray()
+    qtd_disc_dados = raid["qtd_discos"] - 1
+    
+    while bytes_a_ler:
 
-    while bytes_faltam > 0:
-
-        disco, linha, offset, pos_f = get_disc_pos(pos_logica)
-
-        espaco_no_bloco = tam_bloco - offset
-        qtd_ler         = min(espaco_no_bloco, bytes_faltam)
-
+        disco, _, offset, pos_f = get_disc_pos(cursor)
+        espaco_bloco = tam_bloco - offset
+        quanto_ler = min(espaco_bloco, bytes_a_ler)
+       
         if disco not in raid["discos_ausentes"]:
             caminho = os.path.join(raid["pasta"], f"disco{disco}.bin")
             try:
                 with open(caminho, "rb") as f:
                     f.seek(pos_f)
-                    fatia = f.read(qtd_ler)
+                    fatia = f.read(quanto_ler)
             except Exception as e:
                 print(f"Erro ao ler disco{disco}.bin: {e}")
                 return
@@ -285,63 +291,59 @@ def le_raid():
         else:
             print(f"Disco{disco} ausente — reconstruindo via XOR...")
 
-            idx_par   = raid["num_discos"] - 1
-            cam_par   = os.path.join(raid["pasta"], f"disco{idx_par}.bin")
-            pos_bloco = linha * raid["tam_bloco"]
+            idx_par = raid["qtd_discos"] - 1
+            cam_par = os.path.join(raid["pasta"], f"disco{idx_par}.bin")
 
             try:
                 with open(cam_par, "rb") as f:
-                    f.seek(pos_bloco + offset)
-                    fatia = bytearray(f.read(qtd_ler))
+                    f.seek(pos_f)
+                    fatia = bytearray(f.read(quanto_ler))
             except Exception as e:
                 print(f"Erro ao ler paridade: {e}")
                 return
-
-            qtd_disc_dados = raid["num_discos"] - 1
+            
             for i in range(qtd_disc_dados):
                 if i == disco:
                     continue
-                if i in raid["discos_ausentes"]:
-                    continue
-
-                cam_i = os.path.join(raid["pasta"], f"disco{i}.bin")
+                caminho_i = os.path.join(raid["pasta"], f"disco{i}.bin")
                 try:
-                    with open(cam_i, "rb") as f:
-                        f.seek(pos_bloco + offset)
-                        dados_i = f.read(qtd_ler)
+                    with open(caminho_i, "rb") as f:
+                        f.seek(pos_f)
+                        dados_i = f.read(quanto_ler)
 
                     for j in range(len(dados_i)):
-                        fatia[j] ^= dados_i[j]
+                        fatia[j] = fatia[j] ^ dados_i[j]
 
                 except Exception as e:
                     print(f"Erro ao ler disco{i}.bin: {e}")
                     return
 
-        dados_lidos  += fatia
-        bytes_faltam -= qtd_ler
-        pos_logica   += qtd_ler
+        bytes_lidos += fatia
+        bytes_a_ler -= quanto_ler
+        cursor += quanto_ler
 
-    print(f"\n{len(dados_lidos)} bytes lidos:")
+    print(f"\n{len(bytes_lidos)} bytes lidos:")
     try:
-        print(f"\U0001F4C4  {dados_lidos.decode("utf-8")}")
+        print(f"\U0001F4C4  {bytes_lidos.decode('utf-8')}")
 
     except UnicodeDecodeError:
         print("Texto: (dados binários)")
 
     input("\nPressione Enter para continuar...")
 
+
 def remove_disco_raid():
 
     print("\n === Removendo Disco do Raid 4 ===")
+    intervalo = raid["qtd_discos"] - 1
 
     try:
-        intervalo = raid["num_discos"] - 1
         disco = int(input(f"Índice do disco a remover (0 a {intervalo}): "))
     except ValueError:
         print("Erro: Digite apenas números inteiros.")
         return
 
-    if disco < 0 or disco >= raid["num_discos"]:
+    if disco < 0 or disco >= raid["qtd_discos"]:
         print("Erro: índice de disco inválido.")
         return
 
@@ -349,7 +351,7 @@ def remove_disco_raid():
         print(f"Disco{disco}.bin já está ausente!")
         return
 
-    if len(raid["discos_ausentes"]) >= 1:
+    if raid["discos_ausentes"]:
         print("Erro: já existe um disco ausente.")
         print("Remover outro tornaria o RAID irrecuperável.")
         return
@@ -371,11 +373,12 @@ def remove_disco_raid():
     print(f"disco{disco}.bin ausente — leitura e escrita continuam normalmente.")
     print(f"Use reconstroi_raid() para recuperar o disco.")
 
+
 def reconstroi_raid():
 
     print("\n === Reconstruindo Disco do Raid 4 ===")
 
-    if len(raid["discos_ausentes"]) == 0:
+    if not raid["discos_ausentes"]:
         print("Nenhum disco ausente. Reconstrução desnecessária.")
         return
 
@@ -383,17 +386,16 @@ def reconstroi_raid():
         print("Erro: mais de um disco ausente. Impossível reconstruir.")
         return
 
-    disco = raid["discos_ausentes"][0]
-    tam_bloco = raid["tam_bloco"]
-    tam_disco = raid["tam_disco"]
-    num_discos = raid["num_discos"]
-    pasta = raid["pasta"]
+    disco        = raid["discos_ausentes"][0]
+    tam_bloco    = raid["tam_bloco"]
+    tam_disco    = raid["tam_disco"]
+    qtd_discos   = raid["qtd_discos"]  
+    pasta        = raid["pasta"]
     total_blocos = tam_disco // tam_bloco
 
     print(f"Reconstruindo disco{disco}.bin...")
 
-    # cria o arquivo novo zerado
-    caminho_novo = os.path.join(pasta, f"disco{disco}.bin")
+    caminho_novo = os.path.join(pasta, f"disco{disco}.bin")  
     try:
         with open(caminho_novo, "wb") as f:
             f.write(b"\x00" * tam_disco)
@@ -401,29 +403,25 @@ def reconstroi_raid():
         print(f"Erro ao criar disco{disco}.bin: {e}")
         return
 
-    # reconstrói bloco por bloco
     try:
-        for bloco in range(total_blocos):
+        for bloco in range(total_blocos): 
 
-            pos_bloco = bloco * tam_bloco
+            pos_bloco          = bloco * tam_bloco
             bloco_reconstruido = bytearray(tam_bloco)
 
-            # XOR de todos os outros discos (inclusive paridade)
-            for i in range(num_discos):
-
+            for i in range(qtd_discos):
                 if i == disco:
-                    continue  
+                    continue
 
-                cam_i = os.path.join(pasta, f"disco{i}.bin")
-                with open(cam_i, "rb") as f:
+                caminho_i = os.path.join(pasta, f"disco{i}.bin") 
+                with open(caminho_i, "rb") as f:
                     f.seek(pos_bloco)
-                    bloco_i = f.read(tam_bloco)
+                    bloco_i = f.read(tam_bloco) 
 
                 for j in range(len(bloco_i)):
-                    bloco_reconstruido[j] ^= bloco_i[j]
+                    bloco_reconstruido[j] = bloco_reconstruido[j] ^ bloco_i[j]  
 
-            # grava o bloco reconstruído
-            with open(caminho_novo, "r+b") as f:
+            with open(caminho_novo, "r+b") as f:  
                 f.seek(pos_bloco)
                 f.write(bytes(bloco_reconstruido))
 
@@ -437,6 +435,7 @@ def reconstroi_raid():
 
     print(f"\ndisco{disco}.bin reconstruído com sucesso!")
     print("RAID4 operando normalmente. \u2705")
+
 
 def main():
     try:
@@ -460,22 +459,22 @@ def main():
             elif opcao == 2:
                 obtem_raid()
             elif opcao == 3:
-                if raid["num_discos"] == 0:
+                if raid["qtd_discos"] == 0:
                     print("Carregue ou inicialize o RAID primeiro!")
                 else:
                     escreve_raid()
             elif opcao == 4:
-                if raid["num_discos"] == 0:
+                if raid["qtd_discos"] == 0:
                     print("Carregue ou inicialize o RAID primeiro!")
                 else:
                     le_raid()
             elif opcao == 5:
-                if raid["num_discos"] == 0:
+                if raid["qtd_discos"] == 0:
                     print("Carregue ou inicialize o RAID primeiro!")
                 else:
                     remove_disco_raid()
             elif opcao == 6:
-                if raid["num_discos"] == 0:
+                if raid["qtd_discos"] == 0:
                     print("Carregue ou inicialize o RAID primeiro!")
                 else:
                     reconstroi_raid()
@@ -487,6 +486,7 @@ def main():
 
     except KeyboardInterrupt:
         sys.exit("\n\nSimulação encerrada pelo usuário. Até logo!\n")
+
 
 if __name__ == "__main__":
     main()
