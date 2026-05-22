@@ -114,14 +114,15 @@ def processar_fotos(caminho):
 
         gps = extrair_gps(full_path)
         if gps is None:
-            print(f"{arquivo}: sem GPS")
+            print(f"\n{arquivo}: sem GPS")
+            print("-" * 20)
             continue
 
         lat, lon = gps
-        print(f"{arquivo}")
-        print(f"Latitude : {lat}")
-        print(f"Longitude: {lon}")
-        print("-" * 40)
+        print(f"\n{arquivo}")
+        print(f"Latitude : {lat:.5f}")
+        print(f"Longitude: {lon:.5f}")
+        print("-" * 20)
 
         coords.append(f"{lat:.5f},{lon:.5f}")
         if len(coords) == 10:
@@ -133,6 +134,10 @@ def processar_fotos(caminho):
 def main():
     if len(sys.argv) < 2:
         print("Uso: python script.py <diretório>")
+        sys.exit(1)
+
+    if not os.path.isdir(sys.argv[1]):
+        print(f"Erro: '{sys.argv[1]}' não é um diretório válido.")
         sys.exit(1)
 
     coords = processar_fotos(sys.argv[1])
