@@ -6,7 +6,7 @@ def numdiv(n):
             count += 1
     return count
 
-
+sum = 0
 for num in range (1, 1001, 2):
     if numdiv(num) <= 10:
         sum += 1
