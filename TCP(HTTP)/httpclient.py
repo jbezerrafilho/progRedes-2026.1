@@ -65,8 +65,8 @@ if len(sys.argv) == 4:
     get_data(sys.argv[1], sys.argv[2], sys.argv[3])
 else:
     print(
-        "Uso: python hc.py url resource output\n"
-        "Ex:  python hc.py httpbin.org /image/png porco.png \n"
-        "Ex:  python hc.py httpbin.org /image/jpeg lobo.jpg \n"
-        "Ex:  python hc.py viacep.com.br /ws/59062570/json/ meucep.json \n"
+        "Uso: python httpclient.py url resource output\n"
+        "Ex:  python httpclient.py httpbin.org /image/png porco.png \n"
+        "Ex:  python httpclient.py httpbin.org /image/jpeg lobo.jpg \n"
+        "Ex:  python httpclient.py viacep.com.br /ws/59062570/json/ meucep.json \n"
     )
