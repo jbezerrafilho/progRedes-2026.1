@@ -1,29 +1,24 @@
 import socket
-import os
 
-HOST = ''
+HOST = ""
 PORT = 50007
+SERVER = "server/"
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
-    s.listen(1)
+    s.listen()
     print(f'Servidor escutando na porta {PORT}...')
 
     conn, addr = s.accept()
     with conn:
         print('Conectado por', addr)
 
-        filename = conn.recv(1024).decode('utf-8').strip()
-        print(f'Cliente pediu o arquivo: {filename}')
+        filename = conn.recv(1024).decode()
+        print(f'Cliente pediu o arquivo: {filename}', repr(filename))       
+        resource = SERVER + filename
 
-        # pasta "server" que fica do lado do script
-        pasta_server = os.path.join(os.path.dirname(__file__), 'server')
-        caminho_arquivo = os.path.join(pasta_server, filename)
-
-        if not os.path.isfile(caminho_arquivo):
-            conn.send(b'ERRO: arquivo nao encontrado')
-        else:
-            with open(caminho_arquivo, 'rb') as f:
+        try:
+            with open(resource, 'rb') as f:
                 while True:
                     chunk = f.read(1024)
                     if not chunk:
@@ -32,5 +27,9 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     enviados = 0
                     while enviados < len(chunk):
                         enviados += conn.send(chunk[enviados:])
-
             print('Arquivo enviado com sucesso.')
+        except FileNotFoundError:
+            msg = "ERRO! Arquivo não existe!"
+            print(msg)
+
+           
