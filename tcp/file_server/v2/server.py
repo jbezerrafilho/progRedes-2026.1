@@ -1,47 +1,50 @@
 import socket
+from util import send_all
 import os
 
-HOST = ''
-PORT = 50007
+HOST, PORT = "", 5000
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SERVER = os.path.join(BASE_DIR, "server")
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    s.bind((HOST, PORT))
-    s.listen(1)
-    print(f'Servidor escutando na porta {PORT}...')
 
-    conn, addr = s.accept()
+def send_file(conn, filename):
+    try:
+        resource = os.path.join(SERVER, filename)
+        with open(resource, "rb") as fd:
+            data = fd.read()
+            data_len = len(data)
+            send_all(conn, data_len.to_bytes(4, "big"))
+            send_all(conn, data)
+            print(f"Arquivo '{filename}' enviado com sucesso! ({data_len} bytes)")
+    except FileNotFoundError:
+        send_all(conn, (0).to_bytes(4, "big"))
+        print(f"OPS | Arquivo '{filename}' nao existe")
+
+
+def handle_client(conn, addr):
+    print(f"Cliente conectado: {addr}")
     with conn:
-        print('Conectado por', addr)
+        while True:
+            header = conn.recv(2)
+            if not header:
+                break
+            name_len = int.from_bytes(header, "big")
+            filename = conn.recv(name_len).decode()
+            send_file(conn, filename)
 
-        filename = conn.recv(1024).decode('utf-8').strip()
-        print(f'Cliente pediu o arquivo: {filename}')
+    print(f"Cliente desconectado: {addr}")
 
-        pasta_server = os.path.join(os.path.dirname(__file__), 'server')
-        caminho_arquivo = os.path.join(pasta_server, filename)
 
-        if not os.path.isfile(caminho_arquivo):
-            # cabeçalho de erro: tamanho 0 sinaliza que não há conteúdo
-            conn.send(b'ERRO\n')
-        else:
-            with open(caminho_arquivo, 'rb') as f:
-                # descobre o tamanho usando seek/tell
-                f.seek(0, os.SEEK_END)
-                tamanho = f.tell()
-                f.seek(0)  # volta pro início antes de ler!
+def main():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind((HOST, PORT))
+        sock.listen()
+        print(f"Listen: {HOST}:{PORT}")
 
-                # 1. manda o cabeçalho: "OK" + tamanho + delimitador
-                cabecalho = f'OK\n{tamanho}\n'.encode('utf-8')
-                conn.send(cabecalho)
-                print(f'Enviando cabeçalho: {cabecalho}')
+        while True:
+            conn, addr = sock.accept()
+            handle_client(conn, addr)
 
-                # 2. manda o conteúdo do arquivo em blocos
-                while True:
-                    chunk = f.read(1024)
-                    if not chunk:
-                        break
 
-                    enviados = 0
-                    while enviados < len(chunk):
-                        enviados += conn.send(chunk[enviados:])
-
-            print(f'Arquivo enviado com sucesso ({tamanho} bytes).')
+if __name__ == "__main__":
+    main()

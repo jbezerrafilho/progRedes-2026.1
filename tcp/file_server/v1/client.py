@@ -1,8 +1,10 @@
 import socket
+import os
 
 HOST = 'localhost'
 PORT = 50007
-CLIENT = "client/"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CLIENT = os.path.join(BASE_DIR, "client")
 
 filename = input('Digite o nome do arquivo que deseja baixar: ')
 
@@ -17,10 +19,10 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             break
         data += chunk
 
-if data.startswith(b'ERRO'):
+if data.startswith(b'ERRO!'):
     print(data.decode('utf-8'))
 else:
-    output = CLIENT + filename
+    output = os.path.join(CLIENT, filename)
     with open(output, 'wb') as f:
         f.write(data)
     print(f'Arquivo salvo em "{output}" - {len(data)} bytes recebidos')

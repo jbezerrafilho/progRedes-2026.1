@@ -1,51 +1,37 @@
 import socket
+from util import send_all, save
 import os
 
-HOST = 'localhost'
-PORT = 50007
+SERVER = ("192.168.13.100", 5000)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CLIENT = os.path.join(BASE_DIR, "client")
 
-filename = input('Digite o nome do arquivo que deseja baixar: ')
+def get_file(sock, filename):
+    b_name = filename.encode()
+    send_all(sock, len(b_name).to_bytes(2, "big"))
+    send_all(sock, b_name)
 
+    header = sock.recv(4)
+    data_len = int.from_bytes(header, "big")
 
-def recv_linha(sock):
-    """Lê do socket byte a byte até encontrar um '\n' (fim do cabeçalho)."""
-    linha = b''
-    while True:
-        byte = sock.recv(1)
-        if byte == b'\n' or byte == b'':
-            break
-        linha += byte
-    return linha.decode('utf-8')
-
-
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    s.connect((HOST, PORT))
-
-    s.send(filename.encode('utf-8'))
-
-    # 1. lê a primeira linha do cabeçalho: "OK" ou "ERRO"
-    status = recv_linha(s)
-
-    if status == 'ERRO':
-        print('ERRO: arquivo nao encontrado no servidor')
+    if data_len == 0:
+        print("Arquivo não existe\n")
+        return
     else:
-        # 2. lê a segunda linha do cabeçalho: o tamanho do arquivo
-        tamanho_str = recv_linha(s)
-        tamanho = int(tamanho_str)
-        print(f'Tamanho informado pelo servidor: {tamanho} bytes')
+        resource = os.path.join(CLIENT, filename)
+        save(resource, data_len, sock)
+   
 
-        # 3. lê exatamente "tamanho" bytes de conteúdo
-        dados_recebidos = b''
-        while len(dados_recebidos) < tamanho:
-            chunk = s.recv(1024)
-            if not chunk:
-                break  # conexão caiu antes do esperado
-            dados_recebidos += chunk
+def main():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(SERVER)
+        print(f"Conectado ao servidor {SERVER}")
 
-        pasta_client = os.path.join(os.path.dirname(__file__), 'client')
-        caminho_salvar = os.path.join(pasta_client, 'recebido_' + filename)
+        while True:
+            filename = input("Nome do arquivo a baixar (ou 'sair'): ")
+            if filename == "sair":
+                break
+            get_file(sock, filename)
 
-        with open(caminho_salvar, 'wb') as f:
-            f.write(dados_recebidos)
-
-        print(f'Arquivo salvo em "{caminho_salvar}" ({len(dados_recebidos)} bytes recebidos)')
+if __name__ == "__main__":
+    main()

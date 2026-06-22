@@ -1,8 +1,10 @@
 import socket
+import os
 
 HOST = ""
 PORT = 50007
-SERVER = "server/"
+BASE_DIR =os.path.dirname(os.path.abspath(__file__))
+SERVER = os.path.join(BASE_DIR, "server")
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.bind((HOST, PORT))
@@ -14,8 +16,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         print('Conectado por', addr)
 
         filename = conn.recv(1024).decode()
-        print(f'Cliente pediu o arquivo: {filename}', repr(filename))       
-        resource = SERVER + filename
+        print(f'Cliente pediu o arquivo: {filename}')       
+        resource = os.path.join(SERVER, filename)
 
         try:
             with open(resource, 'rb') as f:
@@ -30,6 +32,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print('Arquivo enviado com sucesso.')
         except FileNotFoundError:
             msg = "ERRO! Arquivo não existe!"
+            conn.send(msg.encode())
             print(msg)
 
            
